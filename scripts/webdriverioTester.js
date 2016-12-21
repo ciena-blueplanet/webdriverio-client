@@ -16,17 +16,11 @@
 const _ = require('lodash')
 const Q = require('q')
 const path = require('path')
-const fs = require('fs')
 const exec = require('child_process').exec
 const sleep = require('sleep')
 const argv = require('minimist')(process.argv.slice(2), {
   'boolean': 'app'
 })
-const TOKEN_REVOKED = '~'
-const TRAVIS_USERNAME = 'travis'
-const WEB_FLOW_USERNAME = 'web-flow'
-
-const GitHubAPI = require('github')
 
 /**
  * Helper for creating a promise (so I don't need to disable new-cap everywhere)
@@ -46,12 +40,6 @@ const ns = {
   init () {
     // this is on the object for eaiser mocking
     this.exec = Q.denodeify(exec)
-    this.github = new GitHubAPI({
-      debug: false,
-      protocol: 'https',
-      host: 'api.github.com',
-      timeout: 5000
-    })
     return this
   },
 
@@ -70,8 +58,10 @@ const ns = {
    * @returns {Promise} resolved when done
    */
   tarUpAppAndTestsDirectory (extras) {
-    let cmd = ['tar', '--exclude="*.map"', '-czf', 'test.tar.gz',
-               process.env['E2E_TESTS_DIR'], process.env['BUILD_OUTPUT_DIR']]
+    let cmd = [
+      'tar', '--exclude="*.map"', '-czf', 'test.tar.gz',
+      process.env['E2E_TESTS_DIR'], process.env['BUILD_OUTPUT_DIR']
+    ]
     cmd = cmd.concat(extras)
 
     return this.exec(cmd.join(' '))
@@ -88,116 +78,32 @@ const ns = {
   },
 
   /**
-   * Finds the username of developer using the Travis commit number and the GitHub API
-   * @param {Object} configFile - Contains the username and token of the developer
-   * @returns {Promise} Either resolves with an updated version of the config file or rejects with an error
-   */
-  findUsername (configFile) {
-    return new Promise((resolve, reject) => {
-      console.log(`Your config.json file must contain a valid username and token.
-      Please visit http://wdio.bp.cyaninc.com to sign up to become an authorized third party developer for Ciena. \n\n`)
-      let repo = process.env['TRAVIS_REPO_SLUG'].split('/')
-      let user = repo[0]
-      let sha = process.env['TRAVIS_COMMIT']
-      repo = repo[1]
-      this.github.authenticate({
-        type: 'oauth',
-        token: process.env['RO_GH_TOKEN']
-      })
-      this.github.repos.getCommit({
-        user,
-        repo,
-        sha
-      }, (err, res) => {
-        if (err) {
-          console.log('Error 4: ' + err)
-          reject(err)
-        } else {
-          let author = res.committer.login
-          if (author === WEB_FLOW_USERNAME && res.author.login) {
-            author = res.author.login
-          }
-          configFile.username = author
-          console.log('Author ' + configFile)
-          resolve(configFile)
-        }
-      })
-    })
-  },
-
-  /**
-   * Extracts the config.json file from the tests/e2e directory. If it does not exist, it assumes it on TravisCI, and it attempts
-   * to extract the appropriate environment variables
-   * @returns {Promise} It will either resolve with the configFile or reject with an error
-   */
-  extractConfig () {
-    return new Promise((resolve, reject) => {
-      const configDir = path.join(__dirname, '../../..', process.env['E2E_TESTS_DIR'], 'config.json')
-      let configFile = {}
-      try {
-        configFile = JSON.parse(fs.readFileSync(configDir))
-      } catch (e) {
-        console.log(`Since a config.json file does not exist, we are assuming you are on Travis\n\n`)
-      }
-      _.defaults(configFile, {username: TRAVIS_USERNAME, token: TOKEN_REVOKED})
-      if (configFile.username === TRAVIS_USERNAME) {
-        this.findUsername(configFile).then((result) => {
-          resolve(result)
-        })
-        .catch((err) => {
-          reject(err)
-        })
-      } else {
-        resolve(configFile)
-      }
-    })
-  },
-
-  /**
    * Submit the tarball for test
    * @param {String} server - the protocol/host/port of the server
    * @returns {Promise} resolved when done
    */
   submitTarball (server) {
     console.log('Submitting bundle to ' + server + ' for test...')
-    return this.extractConfig()
-    .then((configFile) => {
-      const cmd = [
-        'curl',
-        '-s',
-        '-H',
-        '"username: ' + configFile.username + '"',
-        '-H',
-        '"token: ' + configFile.token + '"',
-        '-F',
-        '"tarball=@test.tar.gz"',
-        '-F',
-        '"entry-point=' + process.env['BUILD_OUTPUT_DIR'] + '/"',
-        '-F',
-        '"tests-folder=' + process.env['E2E_TESTS_DIR'] + '"',
-        server + '/'
-      ]
-      if (server.toString() === 'localhost:3000') {
-        cmd.splice(2, 0, '-H "x-forwarded-for: 127.0.0.1"')
-      }
-      console.log('Running command: ' + cmd.join(' '))
 
-      return this.exec(cmd.join(' '))
-      .then((res) => {
-        const timestamp = res[0]
-        this.exec()
-        if (isNaN(timestamp)) {
-          throw timestamp
-        }
-        console.log('Server Response/Timestamp: ' + timestamp)
-        return timestamp
-      })
-      .catch((err) => {
-        throw err
-      })
-    })
-    .catch((err) => {
-      throw new Error(err)
+    const cmd = [
+      'curl',
+      '-s',
+      '-F',
+      '"tarball=@test.tar.gz"',
+      '-F',
+      '"entry-point=' + process.env['BUILD_OUTPUT_DIR'] + '/"',
+      '-F',
+      '"tests-folder=' + process.env['E2E_TESTS_DIR'] + '"',
+      server + '/'
+    ]
+
+    console.log('Running command: ' + cmd.join(' '))
+
+    return this.exec(cmd.join(' ')).then((res) => {
+      const stdout = res[0]
+      const timestamp = stdout.toString()
+      console.log('TIMESTAMP: ' + timestamp)
+      return timestamp
     })
   },
 

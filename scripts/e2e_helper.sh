@@ -5,7 +5,7 @@ TEST_PORT=`perl -MSocket -le 'socket S, PF_INET, SOCK_STREAM,getprotobyname("tcp
 HOSTNAME="localhost"
 SELENIUM_HOST="localhost"
 SELENIUM_PORT=4444
-SELENIUM_BROWSER="chrome"
+SELENIUM_BROWSER="firefox"
 BASEDIR=$(dirname $0)
 TEST_RESULT=0
 
@@ -80,6 +80,31 @@ if [ "$1" = "remote_e2e_test" ]; then
   export BUILD_OUTPUT_DIR
   export E2E_TESTS_DIR
 
+  remote_e2e_test
+  exit $TEST_RESULT
+fi
+
+if [ "$1" = "local_e2e_test" ]; then
+  DOCKER_CONTAINER=$(docker ps -ql)
+  DOCKER_PORT=$(echo $(docker inspect --format='{{(index (index .NetworkSettings.Ports "3001/tcp") 0).HostPort}}' $DOCKER_CONTAINER))
+  if [ -z "$DOCKER_PORT" ]; then
+    echo "Cannot find port on Docker system. Is container running with -P flag?"
+    exit 1
+  fi
+
+  WEBDRIVERIO_SERVER=localhost:$DOCKER_PORT
+  echo "DOCKER_CONTAINER: $DOCKER_CONTAINER"
+  echo "DOCKER_PORT: $DOCKER_PORT"
+
+  BUILD_OUTPUT_DIR=$2
+  E2E_TESTS_DIR=$3
+
+  SCREENSHOTS_DIR="$E2E_TESTS_DIR/screenshots"
+  TEST_CONFIG="$E2E_TESTS_DIR/test-config.json"
+
+  export WEBDRIVERIO_SERVER
+  export BUILD_OUTPUT_DIR
+  export E2E_TESTS_DIR
 
   remote_e2e_test
   exit $TEST_RESULT

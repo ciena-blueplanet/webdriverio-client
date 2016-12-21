@@ -7,7 +7,7 @@
     "test": "npm run lint && node tests/dummy-test"
   },
   "bin": {
-    "wdio-client": "./scripts/e2e_helper.sh"
+    "webdriverio-client": "./scripts/e2e_helper.sh"
   },
   "repository": {
     "type": "git",
@@ -33,7 +33,7 @@
   "homepage": "https://github.com/ciena-blueplanet/webdriverio-client#readme",
   "devDependencies": {
     "eslint": "3.1.1",
-    "eslint-config-frost-standard": "3.0.0"
+    "eslint-config-frost-standard": "4.0.1"
   },
   "dependencies": {
     "lodash": "^4.3.0",
