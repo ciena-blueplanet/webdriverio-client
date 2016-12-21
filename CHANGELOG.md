@@ -1,3 +1,8 @@
+# 3.0.0
+- Pulled out all token-based functionality, reverting to original use-case
+- Rebased to original source
+- Updated for Docker use-case and cleaned up `README.md`
+
 # 2.0.1
 * Fixed headers for localhost testing
 

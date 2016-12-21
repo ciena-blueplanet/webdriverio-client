@@ -1,6 +1,6 @@
 {
   "name": "webdriverio-client",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "The client part of the e2e testing framework",
   "scripts": {
     "lint": "eslint .",
